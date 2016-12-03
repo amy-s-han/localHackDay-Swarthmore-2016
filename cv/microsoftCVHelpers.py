@@ -10,7 +10,6 @@ import operator
 
 _url = 'https://api.projectoxford.ai/vision/v1.0/analyze'
 _key = 'e80f8ece393f4eebb3d98b0bb36f04d0'
-_translatorKey = '420c6ab49ed1449db517207d6aef32d9'
 _maxNumRetries = 10
 
 def processRequest( json, data, headers, params ):
@@ -29,6 +28,7 @@ def processRequest( json, data, headers, params ):
 
     while True:
         response = requests.request( 'post', _url, json = json, data = data, headers = headers, params = params )
+        print ("uuuuhhhhh %s", response.status_code)
         if response.status_code == 429: 
 
             print( "Message: %s" % ( response.json()['error']['message'] ) )
