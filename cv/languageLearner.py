@@ -10,25 +10,36 @@ import requests
 import socket
 import urllib
 import utils
+import time
+import threading
 
-NUM_CAMS = 1
-webpageIP = 'http://192.168.43.31:5000'
+_CVkey = 'e80f8ece393f4eebb3d98b0bb36f04d0'
+_translatorKey = '420c6ab49ed1449db517207d6aef32d9'
 
 token = None
 
+translatedLang = ""
+
+streamURLS = 'http://130.58.100.149:8080//video'
 
 def processImages(img):
 	# Computer Vision parameters
-	params = { 'visualFeatures' : 'Categories, Tags, Description, Faces'} 
+	params = { 'visualFeatures' : 'Categories, Tags, Description, Faces'}
+	
+	if translatedLang == 'chinese':
+		params['language'] = 'zh'
+	else:
+		params['language'] = 'en'
 
 	headers = dict()
-	headers['Ocp-Apim-Subscription-Key'] = _key
+	headers['Ocp-Apim-Subscription-Key'] = _CVkey
 	headers['Content-Type'] = 'application/octet-stream'
+
 
 	json = None
 
 	img_str = cv2.imencode('.jpg', img)[1].tostring()
-	result = msCV.processRequest( json, img_str, headers, params)
+	result = msCogServs.processCVRequest( json, img_str, headers, params)
 
 	return result
 
@@ -71,10 +82,10 @@ def sendToTicketAgent(luggagePresent):
 
 		break
         
-def runStream(streamURL, debug = False):
-	print "Hi url: ", streamURL
+def runStream(debug = False):
+	print "Hi streamURLS: ", streamURLS
 
-	stream = urllib.urlopen(streamURL)
+	stream = urllib.urlopen(streamURLS)
 	bytes = ''
 
 	# for setting up udp
@@ -88,6 +99,7 @@ def runStream(streamURL, debug = False):
 
 	print "here2"
 
+	startTime = time.time()
 
 	while True:
 		bytes += stream.read(1024)
@@ -102,19 +114,16 @@ def runStream(streamURL, debug = False):
 
 			cv2.imshow('img ', img)
 			
+			nowTime = time.time()
 
-			# FIX THIS TO FIT THIS LANGLEARNER
-			try:
-				data, addr = sock.recvfrom(1024) # buffer size is 1024 bytes
-				if data == "TAKEPIC": # ticket was scanned! Go process the picture!
-					# print "hi"
-					luggagePresent = idLuggage(img)
-					sendToTicketAgent(luggagePresent)
-			except:
-				pass
-
+			print nowTime
+			if nowTime - startTime > 5: #TAKE A PICTURE!
+				print "take pic"
+				processedImageDescriptions = processImages(img)
+				print processedImageDescriptions
+				break
 			# to exit press ESC!
-			if cv2.waitKey(1) == 27:
+			if cv2.waitKey(15) == 27:
 				print "you tried to exit........"
 				exit(0)   
 
@@ -125,51 +134,69 @@ def eightMinTimer():
 	textHeaders = dict()
 	textHeaders['Content-Type'] = 'application/json'
 	textHeaders['Accept'] = 'application/jwt'
-	textHeaders['Ocp-Apim-Subscription-Key'] = _key
+	textHeaders['Ocp-Apim-Subscription-Key'] = _translatorKey
 
 	while True:
-		sleep(8 * 60) # sleep for 8 minutes, then get new token
+		time.sleep(8 * 60) # sleep for 8 minutes, then get new token
 
 		token = msCogServs.processTokenRequest(textHeaders)
 
 		if token is not None:
 			print "YAYAYAYA token worked"
 			print token
+			now = time.time()
+			f = open("token.txt", "w")
+			f.write(str(now) + "\n")
+			f.write(token)
+			f.close()
 
 
 
-
+def translator():
+	pass
 
 if __name__ == "__main__":
 
-	streamURLS = 'http://192.168.43.100:8080/video'
+	
 
-	worker = threading.Thread(target = runStream, args = (streamURLS))
-	worker.daemon = False
-	worker.start()
+	f = open("token.txt", 'r')
+	firstLine = f.readline()
+	lastTokenTime = float(firstLine)
+	currentTime = time.time()
+	if currentTime - lastTokenTime > 8 * 60: # need new token
+		f.close()
+		f = open("token.txt", "w")
+		textHeaders = dict()
+		textHeaders['Content-Type'] = 'application/json'
+		textHeaders['Accept'] = 'application/jwt'
+		textHeaders['Ocp-Apim-Subscription-Key'] = _translatorKey
+		token = msCogServs.processTokenRequest(textHeaders)
 
-	worker = threading.Thread(target = eightMinTimer, args = ())
-	worker.daemon = False
-	worker.start()
-
-	worker = threading.Thread(target = translator, args = ())
-	worker.daemon = False
-	worker.start()
-
-
-	textHeaders = dict()
-	textHeaders['Content-Type'] = 'application/json'
-	textHeaders['Accept'] = 'application/jwt'
-	textHeaders['Ocp-Apim-Subscription-Key'] = _key
-	token = msCogServs.processTokenRequest(textHeaders, _tokenURL)
-
-	if token is not None:
-		print "YAYAYAYA token worked"
-		print token
+		if token is not None:
+			print "YAYAYAYA new token worked"
+			print token
+			now = time.time()
+			f.write(str(now) + "\n")
+			f.write(token)
+		else:
+			print "Could not get token for translation. Exiting."
+			exit(0)
 	else:
-		print "Could not get token for translation. Exiting."
-		exit(0)
+		token = f.readline()
+		print "successfully read in token: ##", token, "##"
 
+	f.close()
+
+
+	worker = threading.Thread(target = eightMinTimer)
+	worker.daemon = False
+	worker.start()
+
+	# worker = threading.Thread(target = translator)
+	# worker.daemon = False
+	# worker.start()
+
+	runStream()
 
 	if cv2.waitKey(1) == 27:
 		exit(0)
