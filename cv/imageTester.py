@@ -121,7 +121,7 @@ if __name__ == "__main__":
 
 	print "~~~~~~~~~~~~~~~ NOW TRANSLATING ~~~~~~~~~~~~~~~"
 
-	textToTranslate = 'Hello, my name is Amy.'
+	textToTranslate = 'Hello, my name is Lucarne. I like cats and ice cream. On the weekends, I go fishing and skiing. Sometimes, I have lunch with my brother. My brother is a turtle.'
 	langToTranslateTo = 'ja'
 
 	translatorHeaders = dict()
@@ -136,7 +136,9 @@ if __name__ == "__main__":
 
 	translation = msCogServs.processTranslationRequest(translatorHeaders, translatorParameters)
 
-	print "here and translation: ", translation.content
+	length = len(translation.content)
+	translationCleaned = translation.content[68:length - 10]
+	print "here and translation: ", translationCleaned
 
 	# print "~~~~~~~~~~~~~~~ NOW TRANSLATING 2 ~~~~~~~~~~~~~~~"
 

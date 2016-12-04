@@ -18,7 +18,10 @@ _translatorKey = '420c6ab49ed1449db517207d6aef32d9'
 
 token = None
 
+# translatedLang = "ru"
 translatedLang = "es"
+# translatedLang = "fr"
+# translatedLang = "no"
 
 streamURLS = 'http://130.58.100.149:8080//video'
 
@@ -131,9 +134,9 @@ def runStream(debug = False):
 				h = img.shape[0]  #Get image height
 				cv2.putText(img, tCaption, (16, 16), 
 	                cv2.FONT_HERSHEY_SIMPLEX, 0.75,
-	                (100,100,0), 3, cv2.CV_AA)
+	                (0,100,0), 3, cv2.CV_AA)
 
-				sleep(30)
+				time.sleep(3)
 
 				cv2.imshow('img', img)
 				if cv2.waitKey(1000) == 27:
