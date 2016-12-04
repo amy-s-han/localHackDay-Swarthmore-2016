@@ -18,9 +18,11 @@ _translatorKey = '420c6ab49ed1449db517207d6aef32d9'
 
 token = None
 
-translatedLang = ""
+translatedLang = "es"
 
 streamURLS = 'http://130.58.100.149:8080//video'
+
+timeIntervals = [5, 120]
 
 def processImages(img):
 	# Computer Vision parameters
@@ -43,45 +45,43 @@ def processImages(img):
 
 	return result
 
-def sendToTicketAgent(luggagePresent):
-	# POST. "/submitCVResult" 
-	print "POSTING TO TICKET AGENT"
+def translateSentence(sentence):
+	textToTranslate = sentence
 
-	ticketURL = webpageIP + "/submitCVResult"
+	translatorHeaders = dict()
+	translatorHeaders['Accept'] = 'application/xml'
+	translatorParameters = dict()
+	translatorParameters['appid'] = 'Bearer' + ' ' + token
+	translatorParameters['text'] = textToTranslate
+	translatorParameters['to'] = translatedLang
+	translatorParameters['contentType'] = "text/plain"
 
-	if luggagePresent is None or luggagePresent == '':
-		luggagePresent.append("no luggage detected")
+	translation = msCogServs.processTranslationRequest(translatorHeaders, translatorParameters)
 
-	retries = 0
-	result = None
+	print "textToTranslate: ", textToTranslate, " and translation: ", translation.content
+	length = len(translation.content)
+	translationCleaned = translation.content[68:length - 10]
+	return translationCleaned
 
-	while True:
 
-		payload = '{"result": "' + luggagePresent + '"}'
-		headers = {'content-type': "application/json", 'cache-control': "no-cache",}
-		response = requests.request("POST", ticketURL, data = payload, headers = headers)
+def processImageDescriptions(processedImageDescriptions):
+	
+	description = processedImageDescriptions['description']
+	caption = description['captions'][0]['text']
+	print caption
 
-		if response.status_code == 429: 
+	# tags = sorted(description['tags'], key=lambda x: x['confidence'])
+	# print tags
+	tags = [""]
 
-			print( "Message: %s" % ( response.json()['error']['message'] ) )
+	return caption, tags
 
-			if retries <= _maxNumRetries: 
-				time.sleep(1) 
-				retries += 1
-				continue
-			else: 
-				print( 'Error: failed after retrying!' )
-			break
+def handleTranslations(sentence, wordArray):
+	print "~~~~~~~~~~~~~~~ NOW TRANSLATING ~~~~~~~~~~~~~~~"
 
-		elif response.status_code == 200 or response.status_code == 201:
+	return translateSentence(sentence), [""]
 
-			print "success!!!\n"
-		else:
-			print( "Error code: %d" % ( response.status_code ) )
-			print( "Message: %s" % ( response.json()['error']['message'] ) )
 
-		break
-        
 def runStream(debug = False):
 	print "Hi streamURLS: ", streamURLS
 
@@ -101,6 +101,8 @@ def runStream(debug = False):
 
 	startTime = time.time()
 
+	i = 0
+
 	while True:
 		bytes += stream.read(1024)
 
@@ -116,18 +118,40 @@ def runStream(debug = False):
 			
 			nowTime = time.time()
 
-			print nowTime
-			if nowTime - startTime > 5: #TAKE A PICTURE!
-				print "take pic"
+			if nowTime - startTime > timeIntervals[i]: #TAKE A PICTURE!
+				cv2.destroyAllWindows()
 				processedImageDescriptions = processImages(img)
+				print "take pic"
+
 				print processedImageDescriptions
-				break
+				caption, wordArray = processImageDescriptions(processedImageDescriptions)
+				tCaption, tWordArray = handleTranslations(caption, wordArray)
+				
+				# overlay text
+				h = img.shape[0]  #Get image height
+				cv2.putText(img, tCaption, (16, 16), 
+	                cv2.FONT_HERSHEY_SIMPLEX, 0.75,
+	                (100,100,0), 3, cv2.CV_AA)
+
+				sleep(30)
+
+				cv2.imshow('img', img)
+				if cv2.waitKey(1000) == 27:
+					print "you tried to exit........"
+					exit(0)   
+
+				time.sleep(30)
+				i += 1
+
+				if i > len(timeIntervals):
+					break
+				
 			# to exit press ESC!
 			if cv2.waitKey(15) == 27:
 				print "you tried to exit........"
 				exit(0)   
 
-	source.release()
+	# source.release()
 	cv2.destroyAllWindows()
 
 def eightMinTimer():
